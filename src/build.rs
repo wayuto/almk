@@ -14,6 +14,8 @@ pub enum Target {
     DEPS,
 }
 
+static mut LINK: bool = false;
+
 fn get_files(root: &str, target: Target) -> Vec<PathBuf> {
     WalkDir::new(root)
         .into_iter()
@@ -69,6 +71,9 @@ fn compile(
         if fs::metadata(&output).is_ok() {
             continue;
         }
+        unsafe {
+            LINK = true;
+        }
         let cmd = format!(
             "{} {} {} -c {} -o {} -MMD",
             compiler,
@@ -118,6 +123,7 @@ pub fn get_deps(path: impl AsRef<Path>) -> Result<Vec<String>, std::io::Error> {
 }
 
 pub fn build(log: bool) -> Result<(), Box<dyn Error>> {
+    let mut need_deps = true;
     let toml_string = fs::read_to_string(&"./Alumake.toml")?;
     let config: Config = toml::from_str(&toml_string)?;
     if metadata(&"target").is_err() {
@@ -151,6 +157,7 @@ pub fn build(log: bool) -> Result<(), Box<dyn Error>> {
         }
 
         serde_json::to_writer_pretty(fs::File::create("target/deps.json")?, &hash)?;
+        need_deps = false;
     }
 
     if let Some(cc) = config.build.cc {
@@ -174,31 +181,48 @@ pub fn build(log: bool) -> Result<(), Box<dyn Error>> {
             config.build.includes,
         )?;
     }
-
     let name = config.package.name;
-    let object_files = get_files("target/objects", Target::OBJ);
-    let mut link_cmd = config.build.linker.clone();
-    if let Some(lnflags) = config.build.lnflags.clone() {
-        link_cmd.push(' ');
-        link_cmd.push_str(&lnflags);
-        link_cmd.push(' ');
-    } else {
-        link_cmd.push(' ');
+    if unsafe { LINK } || metadata(&format!("target/{}", name)).is_err() {
+        let object_files = get_files("target/objects", Target::OBJ);
+        let mut link_cmd = config.build.linker.clone();
+        if let Some(lnflags) = config.build.lnflags.clone() {
+            link_cmd.push(' ');
+            link_cmd.push_str(&lnflags);
+            link_cmd.push(' ');
+        } else {
+            link_cmd.push(' ');
+        }
+        for file in &object_files {
+            link_cmd.push_str(file.to_str().unwrap());
+            link_cmd.push(' ');
+        }
+        link_cmd.push_str(&format!("-o target/{}", name));
+        if log {
+            println!("{}", link_cmd);
+        }
+        let status = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(link_cmd)
+            .status()?;
+        if !status.success() {
+            return Err(format!("Failed to link file: {:?}", name).into());
+        }
     }
-    for file in &object_files {
-        link_cmd.push_str(file.to_str().unwrap());
-        link_cmd.push(' ');
-    }
-    link_cmd.push_str(&format!("-o target/{}", name));
-    if log {
-        println!("{}", link_cmd);
-    }
-    let status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(link_cmd)
-        .status()?;
-    if !status.success() {
-        return Err(format!("Failed to link file: {:?}", name).into());
+
+    if need_deps {
+        let deps = get_files("target/objects", Target::DEPS);
+        let mut hash: HashMap<String, String> = HashMap::new();
+
+        for dep in deps {
+            let deps = get_deps(&dep)?;
+            for dep in deps {
+                let curr_hash = get_hash(&PathBuf::from(&dep))?;
+                hash.remove(&dep);
+                hash.insert(dep, curr_hash);
+            }
+        }
+
+        serde_json::to_writer_pretty(fs::File::create("target/deps.json")?, &hash)?;
     }
     Ok(())
 }

@@ -38,11 +38,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         Commands::Build => build(true)?,
         Commands::Clean => {
-            if std::fs::metadata(&"target/objects").is_ok() {
-                std::fs::remove_dir_all(&"target/objects")?;
-                println!("Removed object files in 'target/objects' directory.");
+            if std::fs::metadata(&"target/").is_ok() {
+                std::fs::remove_dir_all(&"target/")?;
+                println!("Removed object files in 'target/' directory.");
             } else {
-                println!("No 'target/objects' directory found to clean.");
+                println!("No 'target/' directory found to clean.");
             }
         }
         Commands::Run => {

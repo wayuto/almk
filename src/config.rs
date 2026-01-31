@@ -31,5 +31,14 @@ pub struct Build {
 #[derive(Deserialize, Serialize)]
 pub struct Dependency {
     pub name: String,
-    pub version: String,
+    pub url: String,
+    pub dep_type: Type,
+    pub installation: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub enum Type {
+    Git,
+    Http,
+    Local,
 }
