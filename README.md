@@ -53,14 +53,14 @@ Removed object files in 'target' directory.
 
 ## *Features*
 ### Automatically find and compile all C/C++ files in `src/`
-You don't need to add each file to a configuration file like cmake, or use the unreadable syntax for human like make (I hate it so I created `alum`).
+You don't need to add each file to a configuration file like cmake, or use the unreadable syntax for human like make (I hate it so I created `almk`).
 ### Incremental compilation
 As mentioned above, `almk` supports `incremental compilation`, it'll only compile modified sources. As an example, it'll run the output file directly without compiling again (though it's an easy feature, I really like because I put a lot thought into it).
 ### Managing projects by `Alumake.toml`
-For `alum`, you can manage your project by `Alumake.toml` like manage your rust project by `Cargo.toml`. It's really easier than `CMakelists.txt` or `Makefile` (At least for me). However, as for now, it's too easy to manage a large project, it's better suited for managing small personal project (I'm making efforts to improve it).
+For `almk`, you can manage your project by `Alumake.toml` like manage your rust project by `Cargo.toml`. It's really easier than `CMakelists.txt` or `Makefile` (At least for me). However, as for now, it's too easy to manage a large project, it's better suited for managing small personal project (I'm making efforts to improve it).
 
 ## *Configuration*
-For `alum`, you'll manage all of your project by `Alumake.toml`. In this chapter, I'll introduce it clearly to you.  
+For `almk`, you'll manage all of your project by `Alumake.toml`. In this chapter, I'll introduce it clearly to you.  
 A defalut `Alumake.toml` just like following
 ```toml
 [package]
