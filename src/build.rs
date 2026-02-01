@@ -1,9 +1,9 @@
-use crate::config::Config;
+use crate::{config::Config, sync::sync};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error::Error,
-    fs::{self, metadata, read_to_string},
+    fs::{self, create_dir, metadata, read_to_string},
     path::{Path, PathBuf},
 };
 use walkdir::WalkDir;
@@ -12,6 +12,7 @@ pub enum Target {
     CXXSRC,
     OBJ,
     DEPS,
+    HEADERS,
 }
 
 static mut LINK: bool = false;
@@ -29,6 +30,7 @@ fn get_files(root: &str, target: Target) -> Vec<PathBuf> {
             ),
             Target::OBJ => matches!(p.extension().and_then(|s| s.to_str()), Some("o")),
             Target::DEPS => matches!(p.extension().and_then(|s| s.to_str()), Some("d")),
+            Target::HEADERS => matches!(p.extension().and_then(|s| s.to_str()), Some("h")),
         })
         .collect()
 }
@@ -39,6 +41,58 @@ fn get_hash(path: &PathBuf) -> Result<String, Box<dyn Error>> {
     hasher.update(&content);
     let result = hasher.finalize();
     Ok(format!("{:x}", result))
+}
+
+fn compile_deps(
+    log: bool,
+    compiler: String,
+    debug: bool,
+    flags: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    let debug_flag = if debug {
+        "-g -O0 -DDEBUG"
+    } else {
+        "-O2 -DNDEBUG"
+    };
+    let source_files = get_files(".deps", Target::CSRC);
+    let flags = if let Some(flags) = flags {
+        flags
+    } else {
+        String::new()
+    };
+    if source_files.is_empty() {
+        return Ok(());
+    }
+    for file in source_files {
+        let relative_path = file.strip_prefix(".deps").unwrap();
+        let output = PathBuf::from("target/objects").join(relative_path.with_extension("o"));
+        fs::create_dir_all(output.parent().unwrap())?;
+        if fs::metadata(&output).is_ok() {
+            continue;
+        }
+        unsafe {
+            LINK = true;
+        }
+        let cmd = format!(
+            "{} {} {} -c {} -o {} -MMD",
+            compiler,
+            debug_flag,
+            flags,
+            file.to_str().unwrap(),
+            output.to_str().unwrap(),
+        );
+        if log {
+            println!("{}", cmd);
+        }
+        let status = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(cmd)
+            .status()?;
+        if !status.success() {
+            return Err(format!("Failed to compile file: {:?}", file).into());
+        }
+    }
+    Ok(())
 }
 
 fn compile(
@@ -60,9 +114,26 @@ fn compile(
     } else {
         String::new()
     };
-    if let Some(includes) = includes {
+    if let Some(mut includes) = includes {
+        let headers = get_files(&".deps/", Target::HEADERS);
+        for header in headers {
+            includes.push(header.parent().unwrap().to_str().unwrap().to_string());
+        }
+        let includes: HashSet<_> = includes.into_iter().collect();
         for include in includes {
             flags.push_str(&format!(" -I{}", include));
+        }
+    } else {
+        let headers = get_files(&".deps/", Target::HEADERS);
+        if !headers.is_empty() {
+            let mut includes = Vec::new();
+            for header in headers {
+                includes.push(header.parent().unwrap().to_str().unwrap().to_string());
+            }
+            let includes: HashSet<_> = includes.into_iter().collect();
+            for include in includes {
+                flags.push_str(&format!(" -I{}", include));
+            }
         }
     }
     for file in source_files {
@@ -123,14 +194,15 @@ pub fn get_deps(path: impl AsRef<Path>) -> Result<Vec<String>, std::io::Error> {
 }
 
 pub fn build(log: bool) -> Result<(), Box<dyn Error>> {
+    sync()?;
     let mut need_deps = true;
     let toml_string = fs::read_to_string(&"./Alumake.toml")?;
     let config: Config = toml::from_str(&toml_string)?;
     if metadata(&"target").is_err() {
-        fs::create_dir(&"target")?;
+        create_dir(&"target")?;
     }
     if metadata(&"target/objects").is_err() {
-        fs::create_dir(&"target/objects")?;
+        create_dir(&"target/objects")?;
     } else {
         let deps = get_files("target/objects", Target::DEPS);
         let mut hash: HashMap<String, String> = match read_to_string("target/deps.json") {
@@ -163,12 +235,13 @@ pub fn build(log: bool) -> Result<(), Box<dyn Error>> {
     if let Some(cc) = config.build.cc {
         compile(
             log,
-            cc,
+            cc.clone(),
             config.build.debug,
             Target::CSRC,
             config.build.cflags.clone(),
             config.build.includes.clone(),
         )?;
+        compile_deps(log, cc, config.build.debug, config.build.cflags.clone())?;
     }
 
     if let Some(cxx) = config.build.cxx {

@@ -14,6 +14,22 @@ pub enum Commands {
     Build,
     #[command(about = "Clean the project")]
     Clean,
+    #[command(about = "Add a dependency")]
+    Add {
+        name: String,
+        #[arg(short, long)]
+        url: Option<String>,
+        #[arg(short, long)]
+        local: Option<String>,
+        #[arg(short, long)]
+        git: bool,
+        #[arg(short, long)]
+        tag: Option<String>,
+    },
+    #[command(name = "rm", about = "Remove a dependency")]
+    Remove { name: String },
+    #[command(about = "Pull the dependencies")]
+    Sync,
 }
 
 #[derive(Parser)]

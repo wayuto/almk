@@ -1,5 +1,8 @@
 use crate::config::{Build, Config, Package};
-use std::{error::Error, fs};
+use std::{
+    error::Error,
+    fs::{self, create_dir},
+};
 
 pub fn new(
     name: String,
@@ -29,8 +32,8 @@ pub fn new(
         dependencies: None,
     };
     let toml_string = toml::to_string_pretty(&config)?;
-    fs::create_dir(name.clone())?;
-    fs::create_dir(format!("{}/src", name.clone()))?;
+    create_dir(name.clone())?;
+    create_dir(format!("{}/src", name.clone()))?;
     match language.as_str() {
         "C" => {
             fs::write(

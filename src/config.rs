@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct Config {
     pub package: Package,
     pub build: Build,
-    pub dependencies: Option<Dependency>,
+    pub dependencies: Option<HashMap<String, Dependency>>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -28,17 +30,10 @@ pub struct Build {
     pub includes: Option<Vec<String>>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Dependency {
-    pub name: String,
-    pub url: String,
-    pub dep_type: Type,
-    pub installation: String,
-}
-
-#[derive(Deserialize, Serialize)]
-pub enum Type {
-    Git,
-    Http,
-    Local,
+    pub local: Option<String>,
+    pub url: Option<String>,
+    pub git: bool,
+    pub tag: Option<String>,
 }

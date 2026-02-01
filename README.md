@@ -49,13 +49,24 @@ $ almk clean
 Removed object files in 'target' directory.
 ```
 
+### Add a dependency
+```bash
+$ almk add util -u https://www.website.com/util.zip # or almk add util -u https://www.website.com/util.git -g
+Added dependency 'util'
+```
+
+### Remove a dependency
+```bash
+$ almk rm util
+```
+
 (Though this is a quick start, it's all usage of `almk` so far...)
 
 ## *Features*
 ### Automatically find and compile all C/C++ files in `src/`
 You don't need to add each file to a configuration file like cmake, or use the unreadable syntax for human like make (I hate it so I created `almk`).
 ### Incremental compilation
-As mentioned above, `almk` supports `incremental compilation`, it'll only compile modified sources. As an example, it'll run the output file directly without compiling again (though it's an easy feature, I really like because I put a lot thought into it).
+As mentioned above, `almk` supports `incremental compilation`, it'll only compile modified sources. As an example, it'll run the output file directly without compiling again (though it's an easy feature, I really like because I put a lot thought into it). It depends on `target/deps.json`
 ### Managing projects by `Alumake.toml`
 For `almk`, you can manage your project by `Alumake.toml` like manage your rust project by `Cargo.toml`. It's really easier than `CMakelists.txt` or `Makefile` (At least for me). However, as for now, it's too easy to manage a large project, it's better suited for managing small personal project (I'm making efforts to improve it).
 
@@ -88,7 +99,7 @@ Some feilds are opitonal but reommended, they can help you avoid some unnecessar
 | language | String | optional   |
 ### Build
 As the name said, all of the compilation options will be defined in this field.
-| Field    | Type        | Optionality | description                               |
+| Field    | Type        | Optionality | Description                               |
 | -------- | ----------- | ----------- | ----------------------------------------- |
 | debug    | bool        | required    | optimization for compilation              |
 | linker   | String      | required    | linking `target/objects/*.o` to execuable |
@@ -98,5 +109,23 @@ As the name said, all of the compilation options will be defined in this field.
 | cxxflags | String      | optional    | compilation parameters for C++ compiler   |
 | lnflags  | String      | optional    | compilation parameters for linker         |
 | includes | Vec<String> | optional    | add `-I./path/to/include` when compiling  |
-### Dependencies
-Well, it's defined but I don't implement so far.
+### Dependenciess
+- For `.zip` file:
+```toml
+[dependencies.dep]
+url = "https://www.website.com/dep.zip"
+git = false
+```
+- For `git` repo:
+```toml
+[dependencies.dep]
+url = "https://www.website.com/dep.git"
+git = true
+tag = "v1.0"
+```
+- For `local` file:
+```toml
+[dependencies.dep]
+local = "/path/to/dep"
+git = false
+```
